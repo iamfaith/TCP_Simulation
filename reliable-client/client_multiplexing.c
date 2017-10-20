@@ -27,6 +27,7 @@
 #define ACK "ACK"
 #define NAK "NAK"
 #define SND_CACHE_SIZE 20 //send buffer size 
+#define MAX 65535
 
 typedef struct Node
 {
@@ -265,11 +266,23 @@ int main( int argc, char* argv[] )
             	} else if (strcmp (ACK,cmdString) == 0)
             	{
             		//ack:num
-//            		int j = strcspn (read_buf, SEP);
-//            		char* cmdString = subString(read_buf, 0, i); 
+            		char* indexString = subString(read_buf, 4, MAX); 
+            		int ackIndx = atoi( indexString); 
+            		//remove send list
+            		removeNode(sndList, ackIndx);
 				} else
 				{
 					//nak
+					char* indexString = subString(read_buf, 4, MAX); 
+					int nakIndx = atoi( indexString); 
+					//resend msg
+					Node* resndNode = seek(sndList, nakIndx);
+					if (resndNode != NULL)
+					{
+          				bzero(snd_buf,BUFFER_SIZE);
+          				sprintf(snd_buf, "%d:%s", resndNode->index, resndNode->buf);
+          				int n = write(sockfd,snd_buf,strlen(snd_buf));
+					}
 				}
         	}
         }  
