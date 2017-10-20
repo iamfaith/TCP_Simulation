@@ -73,6 +73,7 @@ void printList(LinkedList *list)
    	if (list->tail != NULL)
    		printf("tail:%s\n", list->tail->buf);
    	printf("size: %d", list->size); 
+	fflush(stdout);
 }
 
 void removeNode(LinkedList *list, int index) 
@@ -107,6 +108,40 @@ void removeNode(LinkedList *list, int index)
        iter = iter->next;
    }
 }
+
+
+int traverseAndSendNAK(LinkedList *list, int sockfd)
+{
+	Node* iter = list->head;
+	int start = -1;
+	if (iter != NULL)
+		start = iter->index;
+   	while(iter != NULL)
+   	{
+   		if (start == iter->index)
+   		{
+			printf("%s\n", iter->buf);
+			fflush(stdout);
+			removeNode(list, start);
+		}
+		else
+		{
+			//send nak
+			for (int i = start; i<iter->index; i++)
+			{
+				char index_buf[INDEX_SIZE];
+				bzero(index_buf,INDEX_SIZE);
+				sprintf(index_buf, "NAK:%d", i); 
+				int n = write(sockfd,index_buf,strlen(index_buf));
+			}
+			return start;
+		}
+		start++;
+       	iter = iter->next;
+   	}
+   	return (start - 1);
+}
+
 
 void addNode(LinkedList *list, int index, char buf[])
 {
@@ -184,7 +219,7 @@ char* subString(char* buf, int start, int end) {
 
 int main( int argc, char* argv[] )  
 {  
-	testList();//for test list
+//	testList();//for test list
 
     if( argc <= 2 )  
     {  
@@ -265,10 +300,12 @@ int main( int argc, char* argv[] )
 				{
 					int recvIndx = atoi( cmdString); 
 					char* recvmsg =  subString(read_buf, i + 1, BUFFER_SIZE); 
-//	            	printf( "recv: %s %d\n", recvmsg, recvIndx );
+	            	printf( "recv: %s %d %d\n", recvmsg, recvIndx, curRecvInx ); //for debug
 					
 					if (curRecvInx == recvIndx)
 					{
+						printf("%s\n", recvmsg);
+						fflush(stdout);
 						// send ack
 						bzero(index_buf,INDEX_SIZE);
 						sprintf(index_buf, "ACK:%d", recvIndx); 
@@ -289,7 +326,10 @@ int main( int argc, char* argv[] )
 					//send response ACK or NAK
 	 	        	int n = write(sockfd,index_buf,strlen(index_buf));
 					//TODO traverse recvList and ouput
-					printf("%s", recvmsg);
+					//TODO find lost data and send NAK
+					int newIndx = traverseAndSendNAK(recvList, sockfd);
+					if (newIndx > 0)
+						curRecvInx = newIndx;
             	} else if (strcmp (ACK,cmdString) == 0)
             	{
             		//ack:num
