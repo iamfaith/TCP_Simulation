@@ -120,8 +120,35 @@ void addNode(LinkedList *list, int index, char buf[])
         list->head = node;
         list->tail = node;  // for the first node, head and tail point to the same node
     }else{
-        list->tail->next = node;  // append the node
-        list->tail = node;        // point the tail at the end
+    	
+		//in order
+		if (list->head->index >= index)
+		{
+			node->next = list->head;
+			list->head = node;
+		} else
+		{
+			if (list->tail->index < index)
+			{
+				list->tail->next = node;  // append the node
+        		list->tail = node;        // point the tail at the end
+			} else
+			{
+				Node* curNode = list->head;
+				Node* preNode = curNode;
+				while(curNode != NULL)
+				{
+					if (index < curNode->index)
+					{
+						preNode->next = node;
+						node->next = curNode;
+						break;		
+					}
+					preNode = curNode; 
+	       			curNode = curNode->next;	
+				}
+			}
+		}
     }
     list->size ++;
 }
@@ -131,10 +158,10 @@ void testList()
 	LinkedList *testList;
 	testList = (LinkedList*)malloc(sizeof(LinkedList));
 	initialize(testList);
-	addNode(testList, 1, "1");
 	addNode(testList, 2, "2");
-	addNode(testList, 3, "3");
+	addNode(testList, 1, "1");
 	addNode(testList, 5, "5");
+	addNode(testList, 3, "3");
 	removeNode(testList, 3);
 	removeNode(testList, 2);
 	removeNode(testList, 1);
