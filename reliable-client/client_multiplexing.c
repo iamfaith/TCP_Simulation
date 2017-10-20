@@ -26,6 +26,7 @@
 #define WRITE_SIZE (BUFFER_SIZE - INDEX_SIZE)
 #define ACK "ACK"
 #define NAK "NAK"
+#define SND_CACHE_SIZE 20 //send buffer size 
 
 typedef struct Node
 {
@@ -70,6 +71,7 @@ void printList(LinkedList *list)
    	}
    	if (list->tail != NULL)
    		printf("tail:%s\n", list->tail->buf);
+   	printf("size: %d", list->size); 
 }
 
 void removeNode(LinkedList *list, int index) 
@@ -197,7 +199,7 @@ int main( int argc, char* argv[] )
     assert( ret != -1 );  
   
   	int msgIndex = 0;
-  	int curRecvInx = 0; 
+  	int curRecvInx = 0; // current recv index
   	
 	LinkedList *sndList;
 	sndList = (LinkedList*)malloc(sizeof(LinkedList));
@@ -230,10 +232,45 @@ int main( int argc, char* argv[] )
             	printf("Error, ask for resend");
             else 
 			{
-				char* indexString = subString(read_buf, 0, i); 
-				int index = atoi( indexString); 
-				char* recvmsg =  subString(read_buf, i + 1, BUFFER_SIZE); 
-            	printf( "recv: %s %d\n", recvmsg, index );  
+				char* cmdString = subString(read_buf, 0, i); 
+				if (strcmp (ACK,cmdString) != 0 && strcmp (NAK,cmdString) != 0)
+				{
+					int recvIndx = atoi( cmdString); 
+					char* recvmsg =  subString(read_buf, i + 1, BUFFER_SIZE); 
+//	            	printf( "recv: %s %d\n", recvmsg, recvIndx );
+					
+					if (curRecvInx == recvIndx)
+					{
+						// send ack
+						bzero(index_buf,INDEX_SIZE);
+						sprintf(index_buf, "ACK:%d", recvIndx); 
+						curRecvInx ++;
+					} else if (curRecvInx > recvIndx)
+					{
+						// send nak
+						bzero(index_buf,INDEX_SIZE);
+						sprintf(index_buf, "NAK:%d", curRecvInx); 
+						//add recv list
+						addNode(recvList, recvIndx, recvmsg);
+					} else
+					{
+						//send ack avoid for duplicate
+						bzero(index_buf,INDEX_SIZE);
+						sprintf(index_buf, "ACK:%d", recvIndx);  
+					}
+					//send response ACK or NAK
+	 	        	int n = write(sockfd,index_buf,strlen(index_buf));
+					//TODO traverse recvList and ouput
+					printf("%s", recvmsg);
+            	} else if (strcmp (ACK,cmdString) == 0)
+            	{
+            		//ack:num
+//            		int j = strcspn (read_buf, SEP);
+//            		char* cmdString = subString(read_buf, 0, i); 
+				} else
+				{
+					//nak
+				}
         	}
         }  
 
@@ -247,12 +284,17 @@ int main( int argc, char* argv[] )
           	fgets(write_buf,WRITE_SIZE,stdin);
           	sprintf(snd_buf, "%s%s", index_buf, write_buf);
           	
-			printf( "msg:[%s]\n", snd_buf );  
-        	int n = write(sockfd,snd_buf,strlen(snd_buf));
-			if (n < 0) 
-				 error("ERROR writing to socket");
-			else
-				msgIndex ++; 
+          	addNode(sndList, msgIndex, snd_buf);
+//			printf( "msg:[%s]\n", snd_buf );
+			  
+			if (sndList->size <= SND_CACHE_SIZE) 
+			{
+	        	int n = write(sockfd,snd_buf,strlen(snd_buf));
+				if (n < 0) 
+					 error("ERROR writing to socket");
+				else
+					msgIndex ++; 
+			}	
 //            ret = splice( 0, NULL, pipefd[1], NULL, 32768, SPLICE_F_MORE | SPLICE_F_MOVE );  
 //            ret = splice( pipefd[0], NULL, sockfd, NULL, 32768, SPLICE_F_MORE | SPLICE_F_MOVE );  
         }  
